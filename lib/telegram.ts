@@ -75,10 +75,10 @@ function getClient(): TelegramClient {
   if (!creds) throw new Error("MISSING_ENV");
   if (!globalThis.__netgramClient) {
     globalThis.__netgramClient = new TelegramClient(
-      new StringSession(readSessionString()),
-      creds.apiId,
-      creds.apiHash,
-      { connectionRetries: 5 }
+        new StringSession(readSessionString()),
+        creds.apiId,
+        creds.apiHash,
+        { connectionRetries: 5 }
     );
   }
   return globalThis.__netgramClient;

@@ -13,8 +13,15 @@ export async function GET(
   if (!isReadAllowed(id)) {
     return NextResponse.json({ error: "chat_not_allowed" }, { status: 403 });
   }
-  const limitParam = new URL(req.url).searchParams.get("limit");
+
+  const url = new URL(req.url);
+  const limitParam = url.searchParams.get("limit");
   const limit = limitParam ? Math.min(Number(limitParam) || 20, 200) : 20;
-  const messages = await getChatMessages(id, limit);
+
+  // Новое: offsetId — ID сообщения, СТАРШЕ которого нужно вернуть историю
+  const offsetIdParam = url.searchParams.get("offsetId");
+  const offsetId = offsetIdParam ? Number(offsetIdParam) : 0;
+
+  const messages = await getChatMessages(id, limit, offsetId);
   return NextResponse.json({ messages });
 }
