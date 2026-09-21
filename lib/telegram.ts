@@ -74,11 +74,21 @@ function getClient(): TelegramClient {
   const creds = getEnvCreds();
   if (!creds) throw new Error("MISSING_ENV");
   if (!globalThis.__netgramClient) {
+    const proxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
+    const clientOptions: any = { connectionRetries: 5 };
+    if (proxy) {
+      const url = new URL(proxy);
+      clientOptions.proxy = {
+        ip: url.hostname,
+        port: parseInt(url.port),
+        socksType: 5,
+      };
+    }
     globalThis.__netgramClient = new TelegramClient(
         new StringSession(readSessionString()),
         creds.apiId,
         creds.apiHash,
-        { connectionRetries: 5 }
+        clientOptions
     );
   }
   return globalThis.__netgramClient;
