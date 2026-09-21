@@ -75,7 +75,7 @@ function getClient(): TelegramClient {
   if (!creds) throw new Error("MISSING_ENV");
   if (!globalThis.__netgramClient) {
     const proxy = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
-    const clientOptions: any = { connectionRetries: 5 };
+    const clientOptions: any = { connectionRetries: 5, useWSS: false };
     if (proxy) {
       const url = new URL(proxy);
       clientOptions.proxy = {
