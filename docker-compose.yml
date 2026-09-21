@@ -4,6 +4,8 @@ services:
     container_name: netgram
     ports:
       - "3000:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - .env
     environment:
