@@ -5,7 +5,7 @@ services:
     ports:
       - "3000:3000"
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "host.docker.internal:172.18.0.1"
     env_file:
       - .env
     environment:
