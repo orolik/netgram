@@ -298,11 +298,12 @@ function parseButtons(replyMarkup: unknown): MsgButton[][] {
 }
 
 export async function getChatMessages(
-  chatId: string,
-  limit = 20
+    chatId: string,
+    limit = 20,
+    offsetId = 0
 ): Promise<ChatMessage[]> {
   const client = await ensureConnected();
-  const messages = await client.getMessages(chatId, { limit });
+  const messages = await client.getMessages(chatId, { limit, offsetId });
   return messages.map((m) => ({
     id: m.id,
     date: m.date,
@@ -460,4 +461,129 @@ export async function clickCallbackButton(
     })
   );
   return result.message ?? "";
+}
+
+// --- Resolve username (канал/группа/юзер) ---
+
+export type ResolvedChat = {
+  id: string;
+  title: string;
+  username: string | null;
+  kind: DialogKind;
+  about: string | null;
+  participantsCount: number | null;
+  photoUrl: string | null;
+};
+
+export async function resolveUsername(
+    username: string
+): Promise<ResolvedChat | null> {
+  const client = await ensureConnected();
+  const clean = username.replace(/^@/, "").trim();
+  if (!clean) return null;
+
+  try {
+    const res = await client.invoke(
+        new Api.contacts.ResolveUsername({ username: clean })
+    );
+
+    // Сначала — канал/группа
+    const chat = res.chats?.[0];
+    if (chat) {
+      return await buildResolvedChat(client, chat);
+    }
+
+    // Потом — пользователь/бот
+    const usr = res.users?.[0];
+    if (usr) {
+      return await buildResolvedUser(client, usr);
+    }
+
+    return null;
+  } catch (err) {
+    console.error("[resolveUsername] failed:", err);
+    return null;
+  }
+}
+
+async function buildResolvedChat(
+    client: TelegramClient,
+    chat: any
+): Promise<ResolvedChat> {
+  const id = utils.getPeerId(chat);
+  const title = "title" in chat ? chat.title ?? "" : "";
+  const uname = "username" in chat ? chat.username ?? null : null;
+  const kind: DialogKind =
+      "broadcast" in chat && chat.broadcast ? "channel" : "group";
+
+  let about: string | null = null;
+  let participantsCount: number | null = null;
+  try {
+    const full = await client.invoke(
+        new Api.channels.GetFullChannel({ channel: chat.id })
+    );
+    const fullChat = full.fullChat as {
+      about?: string;
+      participantsCount?: number;
+    };
+    about = fullChat.about ?? null;
+    participantsCount = fullChat.participantsCount ?? null;
+  } catch {
+    // игнорируем
+  }
+
+  let photoUrl: string | null = null;
+  try {
+    const buf = await client.downloadProfilePhoto(chat);
+    if (buf) {
+      photoUrl = `data:image/jpeg;base64,${Buffer.from(buf).toString("base64")}`;
+    }
+  } catch {
+    // игнорируем
+  }
+
+  return { id, title, username: uname, kind, about, participantsCount, photoUrl };
+}
+
+async function buildResolvedUser(
+    client: TelegramClient,
+    usr: any
+): Promise<ResolvedChat> {
+  const id = usr.id?.toString() ?? "";
+  const title =
+      [usr.firstName, usr.lastName].filter(Boolean).join(" ") ||
+      usr.username ||
+      "(без имени)";
+  const uname = usr.username ?? null;
+  const kind: DialogKind = usr.bot ? "bot" : "user";
+
+  let about: string | null = null;
+  try {
+    const full = await client.invoke(
+        new Api.users.GetFullUser({ id: usr.id })
+    );
+    about = (full.fullUser as { about?: string })?.about ?? null;
+  } catch {
+    // игнорируем
+  }
+
+  let photoUrl: string | null = null;
+  try {
+    const buf = await client.downloadProfilePhoto(usr);
+    if (buf) {
+      photoUrl = `data:image/jpeg;base64,${Buffer.from(buf).toString("base64")}`;
+    }
+  } catch {
+    // игнорируем
+  }
+
+  return {
+    id,
+    title,
+    username: uname,
+    kind,
+    about,
+    participantsCount: null,
+    photoUrl,
+  };
 }
